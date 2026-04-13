@@ -30,6 +30,7 @@ class FeildCanvas {
     this.init();
   }
 
+  // Sets up the website and loads in the image asynchronsuly so that it does not cause issues
   private async init() {
     await this.loadImage("field26.png");
     this.setupCanvas();
@@ -39,6 +40,7 @@ class FeildCanvas {
     this.updateRender();
   }
 
+  // Sets up the visuallization of the zones
   private setupDebugGlobal() {
     (window as any).debug = (state?: boolean) => {
       this.debugMode = state !== undefined ? state : !this.debugMode;
@@ -46,6 +48,7 @@ class FeildCanvas {
       console.log(`[SYS] Debug visualization: ${this.debugMode ? 'ENABLED' : 'DISABLED'}`);
     };
   }
+
 
   private loadImage(src: string): Promise<void> {
     return new Promise((resolve) => {
@@ -58,6 +61,7 @@ class FeildCanvas {
     });
   }
 
+  // Sets the image to scale with the browser and the size of the image
   private setupCanvas() {
     if (!this.backgroundImage || !this.ctx) return;
     
@@ -71,6 +75,8 @@ class FeildCanvas {
     this.canvas.style.height = newHeight + "px";
   }
 
+
+  // Sets up the style for the lines
   private applyStrokeSettings() {
     if (!this.ctx) return;
     this.ctx.lineCap = "round";
@@ -82,6 +88,7 @@ class FeildCanvas {
     this.ctx.imageSmoothingQuality = "high";
   }
 
+  // Draws the image to the canvas
   private drawBackground() {
     if (!this.ctx || !this.backgroundImage) return;
     
@@ -153,23 +160,30 @@ class FeildCanvas {
   }
 
   private drawCatmullRom(points: Point[]) {
-    if (!this.ctx || points.length < 2) return;
+    if (!this.ctx || points.length < 2) return; // Makes sure that there is enough points
     
-    const steps = 20;
+    const steps = 20; // samples per segment, higher = smoother
     this.ctx.beginPath();
     this.ctx.moveTo(points[0].xPos, points[0].yPos);
 
     for (let i = 0; i < points.length - 1; i++) {
+
+      // Sets up the 4 points that the algorithym needs to runb
       const p0 = points[Math.max(i - 1, 0)];
       const p1 = points[i];
       const p2 = points[i + 1];
       const p3 = points[Math.min(i + 2, points.length - 1)];
 
       for (let step = 1; step <= steps; step++) {
+
+        // Sets the time steps for the parametric t value
         const t = step / steps;
         const t2 = t * t;
         const t3 = t2 * t;
 
+
+        // Creates the merged cubic bezier by using a "cubic hermite blend" to create a cubic line between the points.
+        // Uses derivitives I beleive (a bit out of my pay grade and its been a bit sence I have taken calc 2)
         const x = 0.5 * (
           (2 * p1.xPos) +
           (-p0.xPos + p2.xPos) * t +
@@ -298,7 +312,7 @@ class FeildCanvas {
       return;
     }
 
-    // FRC 2024 Field is approx 16.54m x 8.21m
+    // FRC 2026 Field is approx 16.54m x 8.21m
     const fieldWidthMeters = 16.54;
     const fieldHeightMeters = 8.21;
 
@@ -396,6 +410,7 @@ class FeildCanvas {
     document.body.removeChild(dlAnchorElem);
   }
 
+  // Sets up all of the input handeling
   public attachEventListeners(): void {
     this.canvas.addEventListener("pointerdown", (e) => {
       const { x, y } = this.getCanvasMousePos(e);
@@ -432,57 +447,66 @@ class FeildCanvas {
     });
   }
 
-  private static perpendicularDistance(
-    point: Point,
-    lineStart: Point,
-    lineEnd: Point,
-  ): number {
-    const dx = lineEnd.xPos - lineStart.xPos;
-    const dy = lineEnd.yPos - lineStart.yPos;
+  // Calculate how far a point is from a line segment
+private static perpendicularDistance(point: Point, lineStart: Point, lineEnd: Point): number {
+  const dx = lineEnd.xPos - lineStart.xPos;
+  const dy = lineEnd.yPos - lineStart.yPos;
 
-    if (dx === 0 && dy === 0) {
-      return Math.hypot(
-        point.xPos - lineStart.xPos,
-        point.yPos - lineStart.yPos,
-      );
-    }
-
-    const t =
-      ((point.xPos - lineStart.xPos) * dx +
-        (point.yPos - lineStart.yPos) * dy) /
-      (dx * dx + dy * dy);
-    const closestX = lineStart.xPos + t * dx;
-    const closestY = lineStart.yPos + t * dy;
-
-    return Math.hypot(point.xPos - closestX, point.yPos - closestY);
+  // If the line has zero length, just measure direct distance
+  if (dx === 0 && dy === 0) {
+    return Math.hypot(
+      point.xPos - lineStart.xPos,
+      point.yPos - lineStart.yPos,
+    );
   }
 
-  private rdp(points: Point[], epsilon: number): Point[] {
-    if (points.length < 3) return points;
+  // Project the point onto the line, t is a 0-1 value representing
+  // how far along the segment the closest point is
+  const t =
+    ((point.xPos - lineStart.xPos) * dx +
+      (point.yPos - lineStart.yPos) * dy) /
+    (dx * dx + dy * dy);
 
-    let maxDist = 0;
-    let maxIndex = 0;
+  // Reconstruct the actual closest point coordinates from t
+  const closestX = lineStart.xPos + t * dx;
+  const closestY = lineStart.yPos + t * dy;
 
-    for (let i = 1; i < points.length - 1; i++) {
-      const dist = FeildCanvas.perpendicularDistance(
-        points[i],
-        points[0],
-        points[points.length - 1],
-      );
-      if (dist > maxDist) {
-        maxDist = dist;
-        maxIndex = i;
-      }
-    }
+  return Math.hypot(point.xPos - closestX, point.yPos - closestY);
+}
 
-    if (maxDist > epsilon) {
-      const left = this.rdp(points.slice(0, maxIndex + 1), epsilon);
-      const right = this.rdp(points.slice(maxIndex), epsilon);
-      return [...left.slice(0, -1), ...right];
-    } else {
-      return [points[0], points[points.length - 1]];
+// Ramer-Douglas-Peucker algorithm — recursively simplifies a point array
+// by removing points that don't deviate meaningfully from a straight line
+private rdp(points: Point[], epsilon: number): Point[] {
+  // Base case: can't simplify fewer than 3 points
+  if (points.length < 3) return points;
+
+  let maxDist = 0;
+  let maxIndex = 0;
+
+  // Find the point furthest from the line between first and last
+  for (let i = 1; i < points.length - 1; i++) {
+    const dist = FeildCanvas.perpendicularDistance(
+      points[i],
+      points[0],
+      points[points.length - 1],
+    );
+    if (dist > maxDist) {
+      maxDist = dist;
+      maxIndex = i;
     }
   }
+
+  if (maxDist > epsilon) {
+    // The furthest point is significant — keep it and recurse on both halves
+    const left = this.rdp(points.slice(0, maxIndex + 1), epsilon);
+    const right = this.rdp(points.slice(maxIndex), epsilon);
+    // Trim the duplicate point at the split before joining
+    return [...left.slice(0, -1), ...right];
+  } else {
+    // All middle points are within epsilon of a straight line — discard them
+    return [points[0], points[points.length - 1]];
+  }
+}
 
   // --- REGION DEFINITIONS (16.54m x 8.21m Field) ---
   private static readonly REGIONS = [
