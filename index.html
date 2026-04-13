@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auton Paths | FRC Telemetry</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Left HUD Panel -->
+    <aside class="control-panel">
+      <header>
+        <div class="system-status">SYS.ONLINE // FRC-PATH_V1.0</div>
+        <h1>Auton Paths</h1>
+      </header>
+
+      <div class="hud-section">
+        <h2>Telemetry</h2>
+        <div class="readout-grid">
+          <div class="readout-box">
+            <span class="readout-label">CURSOR [X, Y]</span>
+            <span class="readout-value" id="mouse-coords">0, 0</span>
+          </div>
+          <div class="readout-box">
+            <span class="readout-label">START POS</span>
+            <span class="readout-value" id="start-coords">---</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="hud-section" style="margin-top: auto;">
+        <h2>System Actions</h2>
+        <div class="btn-group">
+          <button id="btn-export">
+            <span>Export Waypoints</span>
+            <span class="hotkey">E</span>
+          </button>
+          <button id="btn-clear" class="btn-danger">
+            <span>Clear Field Data</span>
+            <span class="icon">⚠</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Canvas Area -->
+    <main class="canvas-wrapper">
+      <div class="canvas-frame-tl"></div>
+      <div class="canvas-frame-tr"></div>
+      <div class="canvas-frame-bl"></div>
+      <div class="canvas-frame-br"></div>
+      <canvas id="canvas"></canvas>
+    </main>
+
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>

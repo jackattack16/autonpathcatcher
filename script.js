@@ -1,0 +1,389 @@
+"use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+class FeildCanvas {
+    constructor() {
+        this.backgroundImage = null;
+        this.mouseDown = false;
+        this.lastX = 0;
+        this.lastY = 0;
+        this.points = [];
+        // App State
+        this.mode = 'startPos';
+        this.startPoint = null;
+        // DOM Elements
+        this.canvas = document.getElementById("canvas");
+        this.ctx = this.canvas.getContext("2d");
+        this.coordsUi = document.getElementById("mouse-coords");
+        this.startUi = document.getElementById("start-coords");
+        this.btnStartPos = document.getElementById("btn-mode-start");
+        this.btnDrawPath = document.getElementById("btn-mode-path");
+        this.btnClear = document.getElementById("btn-clear");
+        this.btnExport = document.getElementById("btn-export");
+        this.canvas.style.touchAction = "none";
+        this.init();
+    }
+    init() {
+        return __awaiter(this, void 0, void 0, function* () {
+            yield this.loadImage("field26.png");
+            this.setupCanvas();
+            this.attachEventListeners();
+            this.attachUIListeners();
+            this.updateRender();
+        });
+    }
+    loadImage(src) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.src = src;
+            img.onload = () => {
+                this.backgroundImage = img;
+                resolve();
+            };
+        });
+    }
+    setupCanvas() {
+        if (!this.backgroundImage || !this.ctx)
+            return;
+        const scale = 0.5;
+        const newWidth = this.backgroundImage.naturalWidth * scale;
+        const newHeight = this.backgroundImage.naturalHeight * scale;
+        this.canvas.width = newWidth;
+        this.canvas.height = newHeight;
+        this.canvas.style.width = newWidth + "px";
+        this.canvas.style.height = newHeight + "px";
+    }
+    applyStrokeSettings() {
+        if (!this.ctx)
+            return;
+        this.ctx.lineCap = "round";
+        this.ctx.lineWidth = 4;
+        this.ctx.strokeStyle = "#2bff00ff"; // Electric Green
+        // this.ctx.shadowBlur = 10;
+        // this.ctx.shadowColor = "#00f0ff";
+        this.ctx.imageSmoothingEnabled = true;
+        this.ctx.imageSmoothingQuality = "high";
+    }
+    drawBackground() {
+        if (!this.ctx || !this.backgroundImage)
+            return;
+        this.ctx.save();
+        // Apply cyberpunk blueprint filter over the field image
+        // this.ctx.filter = "grayscale(80%) sepia(50%) hue-rotate(180deg) brightness(0.3) contrast(1.2)";
+        this.ctx.drawImage(this.backgroundImage, 0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.restore();
+    }
+    updateRender(currentPathDraw = false) {
+        if (!this.ctx)
+            return;
+        // Clear & draw background
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.drawBackground();
+        // Draw Start Point (first point in the array)
+        if (this.points.length > 0) {
+            this.drawStartNode(this.points[0]);
+        }
+        // Draw Catmull-Rom Path if we have points and are not currently drawing
+        if (!currentPathDraw && this.points.length > 1) {
+            this.applyStrokeSettings();
+            this.drawCatmullRom(this.points);
+        }
+    }
+    drawStartNode(p) {
+        if (!this.ctx)
+            return;
+        this.ctx.save();
+        this.ctx.beginPath();
+        this.ctx.arc(p.xPos, p.yPos, 8, 0, Math.PI * 2);
+        this.ctx.fillStyle = "#000";
+        this.ctx.fill();
+        this.ctx.lineWidth = 3;
+        this.ctx.strokeStyle = "#eaff00"; // Fluent Yellow
+        this.ctx.shadowColor = "#eaff00";
+        this.ctx.shadowBlur = 15;
+        this.ctx.stroke();
+        // Crosshair target inside
+        this.ctx.beginPath();
+        this.ctx.moveTo(p.xPos - 4, p.yPos);
+        this.ctx.lineTo(p.xPos + 4, p.yPos);
+        this.ctx.moveTo(p.xPos, p.yPos - 4);
+        this.ctx.lineTo(p.xPos, p.yPos + 4);
+        this.ctx.strokeStyle = "#eaff00";
+        this.ctx.lineWidth = 2;
+        this.ctx.stroke();
+        this.ctx.restore();
+    }
+    drawCatmullRom(points) {
+        if (!this.ctx || points.length < 2)
+            return;
+        const steps = 20;
+        this.ctx.beginPath();
+        this.ctx.moveTo(points[0].xPos, points[0].yPos);
+        for (let i = 0; i < points.length - 1; i++) {
+            const p0 = points[Math.max(i - 1, 0)];
+            const p1 = points[i];
+            const p2 = points[i + 1];
+            const p3 = points[Math.min(i + 2, points.length - 1)];
+            for (let step = 1; step <= steps; step++) {
+                const t = step / steps;
+                const t2 = t * t;
+                const t3 = t2 * t;
+                const x = 0.5 * ((2 * p1.xPos) +
+                    (-p0.xPos + p2.xPos) * t +
+                    (2 * p0.xPos - 5 * p1.xPos + 4 * p2.xPos - p3.xPos) * t2 +
+                    (-p0.xPos + 3 * p1.xPos - 3 * p2.xPos + p3.xPos) * t3);
+                const y = 0.5 * ((2 * p1.yPos) +
+                    (-p0.yPos + p2.yPos) * t +
+                    (2 * p0.yPos - 5 * p1.yPos + 4 * p2.yPos - p3.yPos) * t2 +
+                    (-p0.yPos + 3 * p1.yPos - 3 * p2.yPos + p3.yPos) * t3);
+                this.ctx.lineTo(x, y);
+            }
+        }
+        this.ctx.stroke();
+        // Draw waypoints / nodes
+        this.ctx.save();
+        this.ctx.fillStyle = "#090a0f";
+        this.ctx.strokeStyle = "#00ff00ff";
+        this.ctx.lineWidth = 2;
+        this.ctx.shadowBlur = 5;
+        this.ctx.shadowColor = "#1eff00ff";
+        for (let i = 1; i < points.length; i++) {
+            const pt = points[i];
+            this.ctx.beginPath();
+            this.ctx.arc(pt.xPos, pt.yPos, 4, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.stroke();
+        }
+        this.ctx.restore();
+    }
+    getCanvasMousePos(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const style = window.getComputedStyle(this.canvas);
+        // Account for CSS borders
+        const borderLeft = parseFloat(style.borderLeftWidth);
+        const borderTop = parseFloat(style.borderTopWidth);
+        const borderRight = parseFloat(style.borderRightWidth);
+        const borderBottom = parseFloat(style.borderBottomWidth);
+        // Get the actual rendered element area (excluding borders)
+        const contentWidth = rect.width - borderLeft - borderRight;
+        const contentHeight = rect.height - borderTop - borderBottom;
+        // Calculate the actual size of the image inside the canvas element (due to object-fit: contain)
+        const containerRatio = contentWidth / contentHeight;
+        const canvasRatio = this.canvas.width / this.canvas.height;
+        let actualRenderedWidth = contentWidth;
+        let actualRenderedHeight = contentHeight;
+        let xOffsetInContent = 0;
+        let yOffsetInContent = 0;
+        if (containerRatio > canvasRatio) {
+            // Letterboxing on the sides
+            actualRenderedWidth = contentHeight * canvasRatio;
+            xOffsetInContent = (contentWidth - actualRenderedWidth) / 2;
+        }
+        else {
+            // Letterboxing on top/bottom
+            actualRenderedHeight = contentWidth / canvasRatio;
+            yOffsetInContent = (contentHeight - actualRenderedHeight) / 2;
+        }
+        // Scale factor: internal buffer size / actual rendered size
+        const scaleX = this.canvas.width / actualRenderedWidth;
+        const scaleY = this.canvas.height / actualRenderedHeight;
+        // Final coordinates relative to the top-left of the internal drawing buffer
+        const x = (e.clientX - rect.left - borderLeft - xOffsetInContent) * scaleX;
+        const y = (e.clientY - rect.top - borderTop - yOffsetInContent) * scaleY;
+        return { x, y };
+    }
+    tryDrawing(e) {
+        if (this.mouseDown && this.ctx) {
+            const { x, y } = this.getCanvasMousePos(e);
+            const point = new Point({ xPos: x, yPos: y });
+            this.points.push(point);
+            this.applyStrokeSettings();
+            this.ctx.beginPath();
+            this.ctx.moveTo(this.lastX, this.lastY);
+            this.ctx.lineTo(x, y);
+            this.ctx.stroke();
+            this.lastX = x;
+            this.lastY = y;
+        }
+    }
+    attachUIListeners() {
+        var _a, _b;
+        (_a = this.btnClear) === null || _a === void 0 ? void 0 : _a.addEventListener("click", () => {
+            this.points = [];
+            if (this.startUi)
+                this.startUi.innerText = "---";
+            this.updateRender();
+        });
+        (_b = this.btnExport) === null || _b === void 0 ? void 0 : _b.addEventListener("click", () => {
+            this.exportPathPlanner();
+        });
+        // Hotkeys
+        window.addEventListener("keydown", (e) => {
+            var _a;
+            if (e.key.toLowerCase() === 'e')
+                (_a = this.btnExport) === null || _a === void 0 ? void 0 : _a.click();
+        });
+    }
+    exportPathPlanner() {
+        if (this.points.length < 2) {
+            alert("Please draw a path first!");
+            return;
+        }
+        // FRC 2024 Field is approx 16.54m x 8.21m
+        const fieldWidthMeters = 16.54;
+        const fieldHeightMeters = 8.21;
+        // Helper to map canvas pixels to PathPlanner meters (Origin at Bottom-Left)
+        const mapPoint = (pt) => {
+            return {
+                x: (pt.xPos / this.canvas.width) * fieldWidthMeters,
+                y: ((this.canvas.height - pt.yPos) / this.canvas.height) * fieldHeightMeters
+            };
+        };
+        const meterPoints = this.points.map(mapPoint);
+        const waypoints = [];
+        for (let i = 0; i < meterPoints.length; i++) {
+            const pt = meterPoints[i];
+            let prevControl = null;
+            let nextControl = null;
+            // Simple bezier control point generation based on surrounding points
+            if (i > 0) {
+                const prev = meterPoints[i - 1];
+                // Pointing back towards previous
+                prevControl = {
+                    x: pt.x + (prev.x - pt.x) * 0.25,
+                    y: pt.y + (prev.y - pt.y) * 0.25
+                };
+            }
+            if (i < meterPoints.length - 1) {
+                const next = meterPoints[i + 1];
+                let dirX = next.x - pt.x;
+                let dirY = next.y - pt.y;
+                // If we have a previous point, smoothly interpolate the tangent
+                if (i > 0) {
+                    const prev = meterPoints[i - 1];
+                    dirX = (next.x - prev.x) * 0.5;
+                    dirY = (next.y - prev.y) * 0.5;
+                }
+                nextControl = {
+                    x: pt.x + dirX * 0.25,
+                    y: pt.y + dirY * 0.25
+                };
+            }
+            waypoints.push({
+                anchor: { x: pt.x, y: pt.y },
+                prevControl: prevControl,
+                nextControl: nextControl,
+                isLocked: false,
+                linkedName: null
+            });
+        }
+        const pathPlannerJson = {
+            version: 1.0,
+            waypoints: waypoints,
+            rotationTargets: [],
+            constraintZones: [],
+            eventMarkers: [],
+            globalConstraints: {
+                maxVelocity: 3.0,
+                maxAcceleration: 3.0,
+                maxAngularVelocity: 540,
+                maxAngularAcceleration: 720
+            },
+            goalEndState: {
+                velocity: 0,
+                rotation: 0,
+                behavior: "default"
+            },
+            reversed: false,
+            folder: null,
+            previewStartingState: {
+                rotation: 0,
+                velocity: 0
+            },
+            useDefaultConstraints: true
+        };
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(pathPlannerJson, null, 2));
+        const dlAnchorElem = document.createElement('a');
+        dlAnchorElem.setAttribute("href", dataStr);
+        dlAnchorElem.setAttribute("download", "auton_path.path");
+        document.body.appendChild(dlAnchorElem);
+        dlAnchorElem.click();
+        document.body.removeChild(dlAnchorElem);
+    }
+    attachEventListeners() {
+        this.canvas.addEventListener("pointerdown", (e) => {
+            const { x, y } = this.getCanvasMousePos(e);
+            this.mouseDown = true;
+            this.lastX = x;
+            this.lastY = y;
+            this.points = [new Point({ xPos: this.lastX, yPos: this.lastY })];
+            if (this.startUi) {
+                this.startUi.innerText = `${Math.round(x)}, ${Math.round(y)}`;
+            }
+            this.updateRender(true);
+        });
+        this.canvas.addEventListener("pointerup", () => {
+            if (this.mouseDown) {
+                this.mouseDown = false;
+                const epsilon = 3;
+                this.points = this.rdp(this.points, epsilon);
+                this.updateRender(); // Draw Catmull Rom curve
+            }
+        });
+        this.canvas.addEventListener("pointermove", (e) => {
+            const { x, y } = this.getCanvasMousePos(e);
+            if (this.coordsUi) {
+                this.coordsUi.innerText = `${Math.round(x)}, ${Math.round(y)}`;
+            }
+            this.tryDrawing(e);
+        });
+    }
+    static perpendicularDistance(point, lineStart, lineEnd) {
+        const dx = lineEnd.xPos - lineStart.xPos;
+        const dy = lineEnd.yPos - lineStart.yPos;
+        if (dx === 0 && dy === 0) {
+            return Math.hypot(point.xPos - lineStart.xPos, point.yPos - lineStart.yPos);
+        }
+        const t = ((point.xPos - lineStart.xPos) * dx +
+            (point.yPos - lineStart.yPos) * dy) /
+            (dx * dx + dy * dy);
+        const closestX = lineStart.xPos + t * dx;
+        const closestY = lineStart.yPos + t * dy;
+        return Math.hypot(point.xPos - closestX, point.yPos - closestY);
+    }
+    rdp(points, epsilon) {
+        if (points.length < 3)
+            return points;
+        let maxDist = 0;
+        let maxIndex = 0;
+        for (let i = 1; i < points.length - 1; i++) {
+            const dist = FeildCanvas.perpendicularDistance(points[i], points[0], points[points.length - 1]);
+            if (dist > maxDist) {
+                maxDist = dist;
+                maxIndex = i;
+            }
+        }
+        if (maxDist > epsilon) {
+            const left = this.rdp(points.slice(0, maxIndex + 1), epsilon);
+            const right = this.rdp(points.slice(maxIndex), epsilon);
+            return [...left.slice(0, -1), ...right];
+        }
+        else {
+            return [points[0], points[points.length - 1]];
+        }
+    }
+}
+const app = new FeildCanvas();
+class Point {
+    constructor({ xPos, yPos }) {
+        this.xPos = xPos;
+        this.yPos = yPos;
+    }
+}
