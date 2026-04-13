@@ -18,15 +18,18 @@ class FeildCanvas {
         // App State
         this.mode = 'startPos';
         this.startPoint = null;
+        this.debugMode = false;
         // DOM Elements
         this.canvas = document.getElementById("canvas");
         this.ctx = this.canvas.getContext("2d");
         this.coordsUi = document.getElementById("mouse-coords");
         this.startUi = document.getElementById("start-coords");
+        this.sequenceUi = document.getElementById("path-sequence");
         this.btnStartPos = document.getElementById("btn-mode-start");
         this.btnDrawPath = document.getElementById("btn-mode-path");
         this.btnClear = document.getElementById("btn-clear");
         this.btnExport = document.getElementById("btn-export");
+        this.checkDebug = document.getElementById("check-debug");
         this.canvas.style.touchAction = "none";
         this.init();
     }
@@ -36,8 +39,16 @@ class FeildCanvas {
             this.setupCanvas();
             this.attachEventListeners();
             this.attachUIListeners();
+            this.setupDebugGlobal();
             this.updateRender();
         });
+    }
+    setupDebugGlobal() {
+        window.debug = (state) => {
+            this.debugMode = state !== undefined ? state : !this.debugMode;
+            this.updateRender();
+            console.log(`[SYS] Debug visualization: ${this.debugMode ? 'ENABLED' : 'DISABLED'}`);
+        };
     }
     loadImage(src) {
         return new Promise((resolve) => {
@@ -94,6 +105,12 @@ class FeildCanvas {
         if (!currentPathDraw && this.points.length > 1) {
             this.applyStrokeSettings();
             this.drawCatmullRom(this.points);
+        }
+        // Visual Debug for Regions
+        this.drawDebugRegions();
+        // Update Sequence UI
+        if (this.sequenceUi) {
+            this.sequenceUi.innerText = this.getPathSequence();
         }
     }
     drawStartNode(p) {
@@ -214,11 +231,13 @@ class FeildCanvas {
         }
     }
     attachUIListeners() {
-        var _a, _b;
+        var _a, _b, _c;
         (_a = this.btnClear) === null || _a === void 0 ? void 0 : _a.addEventListener("click", () => {
             this.points = [];
             if (this.startUi)
                 this.startUi.innerText = "---";
+            if (this.sequenceUi)
+                this.sequenceUi.innerText = "NO DATA";
             this.updateRender();
         });
         (_b = this.btnExport) === null || _b === void 0 ? void 0 : _b.addEventListener("click", () => {
@@ -229,6 +248,10 @@ class FeildCanvas {
             var _a;
             if (e.key.toLowerCase() === 'e')
                 (_a = this.btnExport) === null || _a === void 0 ? void 0 : _a.click();
+        });
+        (_c = this.checkDebug) === null || _c === void 0 ? void 0 : _c.addEventListener("change", (e) => {
+            this.debugMode = e.target.checked;
+            this.updateRender();
         });
     }
     exportPathPlanner() {
@@ -309,10 +332,14 @@ class FeildCanvas {
             },
             useDefaultConstraints: true
         };
+        const sequence = this.getPathSequence();
+        const fileName = sequence !== "NO DATA"
+            ? sequence.toLowerCase().replace(/ \- /g, "_").replace(/ /g, "_") + ".path"
+            : "auton_path.path";
         const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(pathPlannerJson, null, 2));
         const dlAnchorElem = document.createElement('a');
         dlAnchorElem.setAttribute("href", dataStr);
-        dlAnchorElem.setAttribute("download", "auton_path.path");
+        dlAnchorElem.setAttribute("download", fileName);
         document.body.appendChild(dlAnchorElem);
         dlAnchorElem.click();
         document.body.removeChild(dlAnchorElem);
@@ -379,7 +406,93 @@ class FeildCanvas {
             return [points[0], points[points.length - 1]];
         }
     }
+    getRegionName(x, y) {
+        for (const reg of FeildCanvas.REGIONS) {
+            if (reg.type === "circle") {
+                if (Math.hypot(x - reg.x, y - reg.y) < reg.r)
+                    return reg.name;
+            }
+            else if (reg.type === "rect") {
+                if (x >= reg.x && x <= reg.x + reg.w && y >= reg.y && y <= reg.y + reg.h) {
+                    return reg.name;
+                }
+            }
+        }
+        // Fallback based on field side
+        return "unknown";
+    }
+    drawDebugRegions() {
+        if (!this.ctx || !this.debugMode)
+            return;
+        this.ctx.save();
+        const fieldWidthMeters = 16.54;
+        const fieldHeightMeters = 8.21;
+        const toCanvasX = (metersX) => (metersX / fieldWidthMeters) * this.canvas.width;
+        const toCanvasY = (metersY) => this.canvas.height - (metersY / fieldHeightMeters) * this.canvas.height;
+        const toCanvasSize = (meters) => (meters / fieldWidthMeters) * this.canvas.width;
+        for (const reg of FeildCanvas.REGIONS) {
+            this.ctx.strokeStyle = reg.color;
+            this.ctx.lineWidth = 1;
+            this.ctx.setLineDash([5, 5]);
+            if (reg.type === "rect") {
+                const cx = toCanvasX(reg.x);
+                const cy = toCanvasY(reg.y + reg.h);
+                const cw = toCanvasSize(reg.w);
+                const ch = (reg.h / fieldHeightMeters) * this.canvas.height;
+                this.ctx.strokeRect(cx, cy, cw, ch);
+                this.ctx.fillStyle = reg.color;
+                this.ctx.font = "10px Share Tech Mono";
+                this.ctx.fillText(reg.name, cx + 5, cy + 12);
+            }
+            else if (reg.type === "circle") {
+                this.ctx.beginPath();
+                this.ctx.arc(toCanvasX(reg.x), toCanvasY(reg.y), toCanvasSize(reg.r), 0, Math.PI * 2);
+                this.ctx.stroke();
+                this.ctx.fillStyle = reg.color;
+                this.ctx.font = "10px Share Tech Mono";
+                this.ctx.fillText(reg.name, toCanvasX(reg.x) - 15, toCanvasY(reg.y));
+            }
+        }
+        this.ctx.restore();
+    }
+    getPathSequence() {
+        if (this.points.length === 0)
+            return "NO DATA";
+        const regions = [];
+        const fieldWidthMeters = 16.54;
+        const fieldHeightMeters = 8.21;
+        for (const pt of this.points) {
+            const x = (pt.xPos / this.canvas.width) * fieldWidthMeters;
+            const y = ((this.canvas.height - pt.yPos) / this.canvas.height) * fieldHeightMeters;
+            const region = this.getRegionName(x, y);
+            if (regions.length === 0 || regions[regions.length - 1] !== region) {
+                regions.push(region);
+            }
+        }
+        return regions.slice(0, 12).join(" - "); // Cap at 12 regions for readability
+    }
 }
+// --- REGION DEFINITIONS (16.54m x 8.21m Field) ---
+FeildCanvas.REGIONS = [
+    // Higher priority (more specific) regions first
+    { name: "Blue Outpost", type: "rect", x: 0, y: 4.8, w: 1.5, h: 2.2, color: "rgba(0, 240, 255, 0.6)" },
+    { name: "Red Outpost", type: "rect", x: 15, y: 1.2, w: 1.5, h: 2.2, color: "rgba(255, 0, 60, 0.6)" },
+    { name: "Blue Depot", type: "rect", x: 0, y: .5, w: 2.5, h: 1.5, color: "rgba(0, 240, 255, 0.4)" },
+    { name: "Red Depot", type: "rect", x: 14.04, y: 6.2, w: 2.5, h: 1.5, color: "rgba(255, 0, 60, 0.4)" },
+    { name: "Blue Hub", type: "circle", x: 3.75, y: 4.105, r: 1.1, color: "rgba(0, 240, 255, 0.5)" },
+    { name: "Red Hub", type: "circle", x: 13.0, y: 4.105, r: 1.1, color: "rgba(255, 0, 60, 0.5)" },
+    { name: "Trench", type: "rect", x: 4.2, y: 6.55, w: 1.2, h: 1.5, color: "rgba(255, 255, 255, 0.2)" },
+    { name: "Bump", type: "rect", x: 4.2, y: 4.6, w: 1.2, h: 2, color: "rgba(255, 255, 255, 0.2)" },
+    { name: "Trench", type: "rect", x: 4.2, y: 0.0, w: 1.2, h: 1.6, color: "rgba(255, 255, 255, 0.2)" },
+    { name: "Bump", type: "rect", x: 4.2, y: 1.6, w: 1.2, h: 2, color: "rgba(255, 255, 255, 0.2)" },
+    { name: "Trench", type: "rect", x: 11.1, y: 6.55, w: 1.2, h: 1.5, color: "rgba(255, 255, 255, 0.2)" },
+    { name: "Bump", type: "rect", x: 11.1, y: 4.6, w: 1.2, h: 2, color: "rgba(255, 255, 255, 0.2)" },
+    { name: "Trench", type: "rect", x: 11.1, y: 0.0, w: 1.2, h: 1.6, color: "rgba(255, 255, 255, 0.2)" },
+    { name: "Bump", type: "rect", x: 11.1, y: 1.6, w: 1.2, h: 2, color: "rgba(255, 255, 255, 0.2)" },
+    { name: "Neutral Zone", type: "rect", x: 5.5, y: 0, w: 5.5, h: 8.21, color: "rgba(234, 255, 0, 0.3)" },
+    { name: "Blue Alliance Zone", type: "rect", x: 0, y: 0, w: 4.25, h: 8.21, color: "rgba(0, 240, 255, 0.2)" },
+    { name: "Red Alliance Zone", type: "rect", x: 12.24, y: 0, w: 4.5, h: 8.21, color: "rgba(255, 0, 60, 0.2)" },
+];
 const app = new FeildCanvas();
 class Point {
     constructor({ xPos, yPos }) {
