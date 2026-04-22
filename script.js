@@ -29,10 +29,16 @@ class FeildCanvas {
         this.btnDrawPath = document.getElementById("btn-mode-path");
         this.btnClear = document.getElementById("btn-clear");
         this.btnExport = document.getElementById("btn-export");
+        this.btnQr = document.getElementById("btn-qr");
+        this.qrOverlay = document.getElementById("qr-overlay");
+        this.btnCloseQr = document.getElementById("btn-close-qr");
+        this.qrCanvas = document.getElementById("qr-canvas");
+        this.qrPointCount = document.getElementById("qr-point-count");
         this.checkDebug = document.getElementById("check-debug");
         this.canvas.style.touchAction = "none";
         this.init();
     }
+    // Sets up the website and loads in the image asynchronsuly so that it does not cause issues
     init() {
         return __awaiter(this, void 0, void 0, function* () {
             yield this.loadImage("field26.png");
@@ -43,6 +49,7 @@ class FeildCanvas {
             this.updateRender();
         });
     }
+    // Sets up the visuallization of the zones
     setupDebugGlobal() {
         window.debug = (state) => {
             this.debugMode = state !== undefined ? state : !this.debugMode;
@@ -60,6 +67,7 @@ class FeildCanvas {
             };
         });
     }
+    // Sets the image to scale with the browser and the size of the image
     setupCanvas() {
         if (!this.backgroundImage || !this.ctx)
             return;
@@ -71,6 +79,7 @@ class FeildCanvas {
         this.canvas.style.width = newWidth + "px";
         this.canvas.style.height = newHeight + "px";
     }
+    // Sets up the style for the lines
     applyStrokeSettings() {
         if (!this.ctx)
             return;
@@ -82,6 +91,7 @@ class FeildCanvas {
         this.ctx.imageSmoothingEnabled = true;
         this.ctx.imageSmoothingQuality = "high";
     }
+    // Draws the image to the canvas
     drawBackground() {
         if (!this.ctx || !this.backgroundImage)
             return;
@@ -139,19 +149,23 @@ class FeildCanvas {
     }
     drawCatmullRom(points) {
         if (!this.ctx || points.length < 2)
-            return;
-        const steps = 20;
+            return; // Makes sure that there is enough points
+        const steps = 20; // samples per segment, higher = smoother
         this.ctx.beginPath();
         this.ctx.moveTo(points[0].xPos, points[0].yPos);
         for (let i = 0; i < points.length - 1; i++) {
+            // Sets up the 4 points that the algorithym needs to runb
             const p0 = points[Math.max(i - 1, 0)];
             const p1 = points[i];
             const p2 = points[i + 1];
             const p3 = points[Math.min(i + 2, points.length - 1)];
             for (let step = 1; step <= steps; step++) {
+                // Sets the time steps for the parametric t value
                 const t = step / steps;
                 const t2 = t * t;
                 const t3 = t2 * t;
+                // Creates the merged cubic bezier by using a "cubic hermite blend" to create a cubic line between the points.
+                // Uses derivitives I beleive (a bit out of my pay grade and its been a bit sence I have taken calc 2)
                 const x = 0.5 * ((2 * p1.xPos) +
                     (-p0.xPos + p2.xPos) * t +
                     (2 * p0.xPos - 5 * p1.xPos + 4 * p2.xPos - p3.xPos) * t2 +
@@ -231,7 +245,7 @@ class FeildCanvas {
         }
     }
     attachUIListeners() {
-        var _a, _b, _c;
+        var _a, _b, _c, _d, _e;
         (_a = this.btnClear) === null || _a === void 0 ? void 0 : _a.addEventListener("click", () => {
             this.points = [];
             if (this.startUi)
@@ -243,13 +257,22 @@ class FeildCanvas {
         (_b = this.btnExport) === null || _b === void 0 ? void 0 : _b.addEventListener("click", () => {
             this.exportPathPlanner();
         });
+        (_c = this.btnQr) === null || _c === void 0 ? void 0 : _c.addEventListener("click", () => {
+            this.generateQRCode();
+        });
+        (_d = this.btnCloseQr) === null || _d === void 0 ? void 0 : _d.addEventListener("click", () => {
+            var _a;
+            (_a = this.qrOverlay) === null || _a === void 0 ? void 0 : _a.classList.add("hidden");
+        });
         // Hotkeys
         window.addEventListener("keydown", (e) => {
-            var _a;
+            var _a, _b;
             if (e.key.toLowerCase() === 'e')
                 (_a = this.btnExport) === null || _a === void 0 ? void 0 : _a.click();
+            if (e.key.toLowerCase() === 'q')
+                (_b = this.btnQr) === null || _b === void 0 ? void 0 : _b.click();
         });
-        (_c = this.checkDebug) === null || _c === void 0 ? void 0 : _c.addEventListener("change", (e) => {
+        (_e = this.checkDebug) === null || _e === void 0 ? void 0 : _e.addEventListener("change", (e) => {
             this.debugMode = e.target.checked;
             this.updateRender();
         });
@@ -259,7 +282,7 @@ class FeildCanvas {
             alert("Please draw a path first!");
             return;
         }
-        // FRC 2024 Field is approx 16.54m x 8.21m
+        // FRC 2026 Field is approx 16.54m x 8.21m
         const fieldWidthMeters = 16.54;
         const fieldHeightMeters = 8.21;
         // Helper to map canvas pixels to PathPlanner meters (Origin at Bottom-Left)
@@ -344,6 +367,45 @@ class FeildCanvas {
         dlAnchorElem.click();
         document.body.removeChild(dlAnchorElem);
     }
+    generateQRCode() {
+        if (this.points.length < 2) {
+            alert("Please draw a path first!");
+            return;
+        }
+        const fieldWidthMeters = 16.54;
+        const fieldHeightMeters = 8.21;
+        // Compact list of points: X.XX,Y.YY;...
+        const dataString = this.points.map(pt => {
+            const mx = (pt.xPos / this.canvas.width) * fieldWidthMeters;
+            const my = ((this.canvas.height - pt.yPos) / this.canvas.height) * fieldHeightMeters;
+            return `${mx.toFixed(2)},${my.toFixed(2)}`;
+        }).join(";");
+        if (window.QRCode) {
+            window.QRCode.toCanvas(this.qrCanvas, dataString, {
+                width: 300,
+                margin: 2,
+                color: {
+                    dark: "#000000",
+                    light: "#ffffff"
+                }
+            }, (error) => {
+                var _a;
+                if (error) {
+                    console.error("QR Generation Error:", error);
+                    alert("Failed to generate QR code. Too much data?");
+                }
+                else {
+                    if (this.qrPointCount)
+                        this.qrPointCount.innerText = `${this.points.length} WAYPOINTS`;
+                    (_a = this.qrOverlay) === null || _a === void 0 ? void 0 : _a.classList.remove("hidden");
+                }
+            });
+        }
+        else {
+            alert("QR library not loaded!");
+        }
+    }
+    // Sets up all of the input handeling
     attachEventListeners() {
         this.canvas.addEventListener("pointerdown", (e) => {
             const { x, y } = this.getCanvasMousePos(e);
@@ -372,24 +434,33 @@ class FeildCanvas {
             this.tryDrawing(e);
         });
     }
+    // Calculate how far a point is from a line segment
     static perpendicularDistance(point, lineStart, lineEnd) {
         const dx = lineEnd.xPos - lineStart.xPos;
         const dy = lineEnd.yPos - lineStart.yPos;
+        // If the line has zero length, just measure direct distance
         if (dx === 0 && dy === 0) {
             return Math.hypot(point.xPos - lineStart.xPos, point.yPos - lineStart.yPos);
         }
+        // Project the point onto the line, t is a 0-1 value representing
+        // how far along the segment the closest point is
         const t = ((point.xPos - lineStart.xPos) * dx +
             (point.yPos - lineStart.yPos) * dy) /
             (dx * dx + dy * dy);
+        // Reconstruct the actual closest point coordinates from t
         const closestX = lineStart.xPos + t * dx;
         const closestY = lineStart.yPos + t * dy;
         return Math.hypot(point.xPos - closestX, point.yPos - closestY);
     }
+    // Ramer-Douglas-Peucker algorithm — recursively simplifies a point array
+    // by removing points that don't deviate meaningfully from a straight line
     rdp(points, epsilon) {
+        // Base case: can't simplify fewer than 3 points
         if (points.length < 3)
             return points;
         let maxDist = 0;
         let maxIndex = 0;
+        // Find the point furthest from the line between first and last
         for (let i = 1; i < points.length - 1; i++) {
             const dist = FeildCanvas.perpendicularDistance(points[i], points[0], points[points.length - 1]);
             if (dist > maxDist) {
@@ -398,11 +469,14 @@ class FeildCanvas {
             }
         }
         if (maxDist > epsilon) {
+            // The furthest point is significant — keep it and recurse on both halves
             const left = this.rdp(points.slice(0, maxIndex + 1), epsilon);
             const right = this.rdp(points.slice(maxIndex), epsilon);
+            // Trim the duplicate point at the split before joining
             return [...left.slice(0, -1), ...right];
         }
         else {
+            // All middle points are within epsilon of a straight line — discard them
             return [points[0], points[points.length - 1]];
         }
     }

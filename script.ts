@@ -23,6 +23,12 @@ class FeildCanvas {
   private btnDrawPath = document.getElementById("btn-mode-path");
   private btnClear = document.getElementById("btn-clear");
   private btnExport = document.getElementById("btn-export");
+  private btnQr = document.getElementById("btn-qr");
+  private qrOverlay = document.getElementById("qr-overlay");
+  private btnCloseQr = document.getElementById("btn-close-qr");
+  private qrCanvas = document.getElementById("qr-canvas") as HTMLCanvasElement;
+  private qrPointCount = document.getElementById("qr-point-count");
+
   private checkDebug = document.getElementById("check-debug") as HTMLInputElement;
 
   constructor() {
@@ -295,9 +301,18 @@ class FeildCanvas {
       this.exportPathPlanner();
     });
 
+    this.btnQr?.addEventListener("click", () => {
+      this.generateQRCode();
+    });
+
+    this.btnCloseQr?.addEventListener("click", () => {
+      this.qrOverlay?.classList.add("hidden");
+    });
+
     // Hotkeys
     window.addEventListener("keydown", (e) => {
       if (e.key.toLowerCase() === 'e') this.btnExport?.click();
+      if (e.key.toLowerCase() === 'q') this.btnQr?.click();
     });
 
     this.checkDebug?.addEventListener("change", (e) => {
@@ -408,6 +423,44 @@ class FeildCanvas {
     document.body.appendChild(dlAnchorElem);
     dlAnchorElem.click();
     document.body.removeChild(dlAnchorElem);
+  }
+
+  private generateQRCode() {
+    if (this.points.length < 2) {
+      alert("Please draw a path first!");
+      return;
+    }
+
+    const fieldWidthMeters = 16.54;
+    const fieldHeightMeters = 8.21;
+
+    // Compact list of points: X.XX,Y.YY;...
+    const dataString = this.points.map(pt => {
+      const mx = (pt.xPos / this.canvas.width) * fieldWidthMeters;
+      const my = ((this.canvas.height - pt.yPos) / this.canvas.height) * fieldHeightMeters;
+      return `${mx.toFixed(2)},${my.toFixed(2)}`;
+    }).join(";");
+
+    if ((window as any).QRCode) {
+      (window as any).QRCode.toCanvas(this.qrCanvas, dataString, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: "#000000",
+          light: "#ffffff"
+        }
+      }, (error: any) => {
+        if (error) {
+          console.error("QR Generation Error:", error);
+          alert("Failed to generate QR code. Too much data?");
+        } else {
+          if (this.qrPointCount) this.qrPointCount.innerText = `${this.points.length} WAYPOINTS`;
+          this.qrOverlay?.classList.remove("hidden");
+        }
+      });
+    } else {
+      alert("QR library not loaded!");
+    }
   }
 
   // Sets up all of the input handeling

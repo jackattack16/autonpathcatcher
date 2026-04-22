@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Auton Paths | FRC Telemetry</title>
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
 </head>
 <body>
   <div class="app-container">
@@ -49,6 +50,10 @@
             <span>Export Waypoints</span>
             <span class="hotkey">E</span>
           </button>
+          <button id="btn-qr">
+            <span>Generate QR Code</span>
+            <span class="hotkey">Q</span>
+          </button>
           <button id="btn-clear" class="btn-danger">
             <span>Clear Field Data</span>
             <span class="icon">⚠</span>
@@ -56,6 +61,24 @@
         </div>
       </div>
     </aside>
+
+    <!-- QR Modal Overlay -->
+    <div id="qr-overlay" class="overlay hidden">
+      <div class="modal qr-modal">
+        <header>
+          <div class="system-status">DATA.TRANSMIT // QR-LINK</div>
+          <h2>Path Waypoints</h2>
+          <button id="btn-close-qr" class="close-btn">×</button>
+        </header>
+        <div class="qr-content">
+          <canvas id="qr-canvas"></canvas>
+          <div class="qr-meta">
+            <span id="qr-point-count">0 POINTS</span>
+            <span id="qr-encoding">UTF-8 / COMPRESSED</span>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Main Canvas Area -->
     <main class="canvas-wrapper">
