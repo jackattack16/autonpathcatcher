@@ -243,6 +243,31 @@ button.btn-danger .icon {
   color: var(--accent-danger);
 }
 
+/* Metadata Inputs */
+.cyber-input {
+  background: rgba(0, 240, 255, 0.05);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  color: var(--accent-cyan);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  width: 100%;
+  padding: 8px;
+  margin-top: 5px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+.cyber-input:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 10px var(--accent-cyan-glow);
+  background: rgba(0, 240, 255, 0.1);
+}
+/* Remove spinner for Chrome/Safari/Edge/Opera */
+.cyber-input::-webkit-outer-spin-button,
+.cyber-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 /* Canvas Area */
 .canvas-wrapper {
   flex-grow: 1;

@@ -34,6 +34,8 @@ class FeildCanvas {
         this.btnCloseQr = document.getElementById("btn-close-qr");
         this.qrCanvas = document.getElementById("qr-canvas");
         this.qrPointCount = document.getElementById("qr-point-count");
+        this.inputTeam = document.getElementById("input-team");
+        this.teamDisplay = document.getElementById("team-display");
         this.checkDebug = document.getElementById("check-debug");
         this.canvas.style.touchAction = "none";
         this.init();
@@ -245,7 +247,7 @@ class FeildCanvas {
         }
     }
     attachUIListeners() {
-        var _a, _b, _c, _d, _e;
+        var _a, _b, _c, _d, _e, _f;
         (_a = this.btnClear) === null || _a === void 0 ? void 0 : _a.addEventListener("click", () => {
             this.points = [];
             if (this.startUi)
@@ -264,6 +266,11 @@ class FeildCanvas {
             var _a;
             (_a = this.qrOverlay) === null || _a === void 0 ? void 0 : _a.classList.add("hidden");
         });
+        (_e = this.inputTeam) === null || _e === void 0 ? void 0 : _e.addEventListener("input", (e) => {
+            if (this.teamDisplay) {
+                this.teamDisplay.innerText = e.target.value || "0000";
+            }
+        });
         // Hotkeys
         window.addEventListener("keydown", (e) => {
             var _a, _b;
@@ -272,12 +279,13 @@ class FeildCanvas {
             if (e.key.toLowerCase() === 'q')
                 (_b = this.btnQr) === null || _b === void 0 ? void 0 : _b.click();
         });
-        (_e = this.checkDebug) === null || _e === void 0 ? void 0 : _e.addEventListener("change", (e) => {
+        (_f = this.checkDebug) === null || _f === void 0 ? void 0 : _f.addEventListener("change", (e) => {
             this.debugMode = e.target.checked;
             this.updateRender();
         });
     }
     exportPathPlanner() {
+        var _a;
         if (this.points.length < 2) {
             alert("Please draw a path first!");
             return;
@@ -332,6 +340,7 @@ class FeildCanvas {
         }
         const pathPlannerJson = {
             version: 1.0,
+            team: ((_a = this.inputTeam) === null || _a === void 0 ? void 0 : _a.value) || "3928",
             waypoints: waypoints,
             rotationTargets: [],
             constraintZones: [],
@@ -368,18 +377,21 @@ class FeildCanvas {
         document.body.removeChild(dlAnchorElem);
     }
     generateQRCode() {
+        var _a;
         if (this.points.length < 2) {
             alert("Please draw a path first!");
             return;
         }
         const fieldWidthMeters = 16.54;
         const fieldHeightMeters = 8.21;
-        // Compact list of points: X.XX,Y.YY;...
-        const dataString = this.points.map(pt => {
+        const team = ((_a = this.inputTeam) === null || _a === void 0 ? void 0 : _a.value) || "3928";
+        // Compact list of points: TEAM|X.XX,Y.YY;...
+        const pointData = this.points.map(pt => {
             const mx = (pt.xPos / this.canvas.width) * fieldWidthMeters;
             const my = ((this.canvas.height - pt.yPos) / this.canvas.height) * fieldHeightMeters;
             return `${mx.toFixed(2)},${my.toFixed(2)}`;
         }).join(";");
+        const dataString = `${team}|${pointData}`;
         if (window.QRCode) {
             window.QRCode.toCanvas(this.qrCanvas, dataString, {
                 width: 300,

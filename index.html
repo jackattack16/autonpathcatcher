@@ -13,7 +13,7 @@
     <!-- Left HUD Panel -->
     <aside class="control-panel">
       <header>
-        <div class="system-status">SYS.ONLINE // FRC-PATH_V1.0</div>
+        <div class="system-status">SYS.ONLINE // TEAM_<span id="team-display">3928</span></div>
         <h1>Auton Paths</h1>
       </header>
 
@@ -32,6 +32,14 @@
         <div class="readout-box full-width" style="margin-top: 12px; min-height: 80px; display: flex; flex-direction: column;">
           <span class="readout-label">PATH SEQUENCE</span>
           <span class="readout-value" id="path-sequence" style="font-size: 13px; line-height: 1.5; word-break: break-word; flex-grow: 1; padding-top: 5px;">NO DATA</span>
+        </div>
+      </div>
+
+      <div class="hud-section">
+        <h2>Team Metadata</h2>
+        <div class="readout-box full-width">
+          <span class="readout-label">TEAM IDENTIFIER</span>
+          <input type="number" id="input-team" value="3928" class="cyber-input">
         </div>
       </div>
 

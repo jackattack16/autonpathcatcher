@@ -29,6 +29,9 @@ class FeildCanvas {
   private qrCanvas = document.getElementById("qr-canvas") as HTMLCanvasElement;
   private qrPointCount = document.getElementById("qr-point-count");
 
+  private inputTeam = document.getElementById("input-team") as HTMLInputElement;
+  private teamDisplay = document.getElementById("team-display");
+
   private checkDebug = document.getElementById("check-debug") as HTMLInputElement;
 
   constructor() {
@@ -309,6 +312,12 @@ class FeildCanvas {
       this.qrOverlay?.classList.add("hidden");
     });
 
+    this.inputTeam?.addEventListener("input", (e) => {
+      if (this.teamDisplay) {
+        this.teamDisplay.innerText = (e.target as HTMLInputElement).value || "0000";
+      }
+    });
+
     // Hotkeys
     window.addEventListener("keydown", (e) => {
       if (e.key.toLowerCase() === 'e') this.btnExport?.click();
@@ -387,6 +396,7 @@ class FeildCanvas {
 
     const pathPlannerJson = {
       version: 1.0,
+      team: this.inputTeam?.value || "3928",
       waypoints: waypoints,
       rotationTargets: [],
       constraintZones: [],
@@ -433,13 +443,16 @@ class FeildCanvas {
 
     const fieldWidthMeters = 16.54;
     const fieldHeightMeters = 8.21;
+    const team = this.inputTeam?.value || "3928";
 
-    // Compact list of points: X.XX,Y.YY;...
-    const dataString = this.points.map(pt => {
+    // Compact list of points: TEAM|X.XX,Y.YY;...
+    const pointData = this.points.map(pt => {
       const mx = (pt.xPos / this.canvas.width) * fieldWidthMeters;
       const my = ((this.canvas.height - pt.yPos) / this.canvas.height) * fieldHeightMeters;
       return `${mx.toFixed(2)},${my.toFixed(2)}`;
     }).join(";");
+
+    const dataString = `${team}|${pointData}`;
 
     if ((window as any).QRCode) {
       (window as any).QRCode.toCanvas(this.qrCanvas, dataString, {
